@@ -5,7 +5,15 @@ import { toast } from "sonner";
 import {
   Radar, Link2, Copy, Trash2, MapPin, Download, Zap, ExternalLink,
   MousePointerClick, Globe, Send, CheckCircle2, Clock, XCircle,
+  Smartphone, Tablet, Monitor,
 } from "lucide-react";
+
+const DeviceIcon = ({ type }) => {
+  const props = { size: 15, className: "shrink-0 text-[#06B6D4]" };
+  if (type === "mobile") return <Smartphone {...props} />;
+  if (type === "tablet") return <Tablet {...props} />;
+  return <Monitor {...props} />;
+};
 
 const STATUS_STYLES = {
   pending: { color: "#F59E0B", icon: Clock, label: "Pending" },
@@ -220,6 +228,7 @@ export default function Dashboard() {
                   <tr className="border-b border-[#26334D] text-left text-[#94A3B8] font-mono text-xs uppercase tracking-wider">
                     <th className="px-4 py-3">Link</th>
                     <th className="px-4 py-3">Location</th>
+                    <th className="px-4 py-3">Device</th>
                     <th className="px-4 py-3">Coordinates</th>
                     <th className="px-4 py-3">Method</th>
                     <th className="px-4 py-3">Time</th>
@@ -228,7 +237,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {records.length === 0 ? (
-                    <tr><td colSpan={6} className="px-4 py-10 text-center text-[#94A3B8]">No location signals captured yet.</td></tr>
+                    <tr><td colSpan={7} className="px-4 py-10 text-center text-[#94A3B8]">No location signals captured yet.</td></tr>
                   ) : (
                     records.map((r) => {
                       const st = STATUS_STYLES[r.dispatch_status] || STATUS_STYLES.pending;
@@ -236,6 +245,15 @@ export default function Dashboard() {
                         <tr key={r.id} className="border-b border-[#26334D]/60 hover:bg-[#182030]/50 transition-colors" data-testid={`record-row-${r.id}`}>
                           <td className="px-4 py-3 font-mono text-[#10B981]">/{r.short_code}</td>
                           <td className="px-4 py-3 max-w-[240px] truncate">{r.place || r.city || "—"}</td>
+                          <td className="px-4 py-3 max-w-[200px]">
+                            <div className="flex items-center gap-1.5">
+                              <DeviceIcon type={r.device_type} />
+                              <div className="min-w-0">
+                                <div className="truncate text-xs">{[r.device_brand, r.device_model].filter(Boolean).join(" ") || (r.device_type ? r.device_type.charAt(0).toUpperCase() + r.device_type.slice(1) : "Unknown")}</div>
+                                <div className="truncate text-[10px] text-[#94A3B8] font-mono">{[r.os, r.browser].filter(Boolean).join(" · ") || "—"}</div>
+                              </div>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 font-mono text-xs text-[#94A3B8]">{r.lat != null ? `${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}` : "—"}</td>
                           <td className="px-4 py-3"><span className="text-xs uppercase font-mono text-[#06B6D4]">{r.method}</span></td>
                           <td className="px-4 py-3 text-xs text-[#94A3B8] whitespace-nowrap">{new Date(r.timestamp).toLocaleString()}</td>

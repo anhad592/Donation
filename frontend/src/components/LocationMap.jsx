@@ -42,6 +42,8 @@ export const LocationMap = ({ records }) => {
                 <div className="text-[#10B981] font-bold uppercase tracking-wider">/{r.short_code}</div>
                 <div>{r.place || r.city || "Unknown location"}</div>
                 <div>{r.lat?.toFixed(5)}, {r.lng?.toFixed(5)}</div>
+                <div className="text-[#F1F5F9]">{[r.device_brand, r.device_model].filter(Boolean).join(" ") || r.device_type || "Unknown device"}</div>
+                <div className="text-[#94A3B8]">{[r.os, r.browser].filter(Boolean).join(" · ")}</div>
                 <div className="text-[#94A3B8]">{new Date(r.timestamp).toLocaleString()}</div>
                 <div className="text-[#F59E0B] uppercase">{r.method} · {r.dispatch_status}</div>
               </div>
