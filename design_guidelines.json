@@ -1,0 +1,73 @@
+{
+  "project_name": "GeoReach Aid & Link Location Beacon",
+  "app_type": "hybrid_fullstack",
+  "design_archetype": "Tactical Aid Command Center (Obsidian Obsidian & Glowing Emerald-Amber)",
+  "theme": {
+    "mode": "dark",
+    "background_primary": "#0A0D14",
+    "background_secondary": "#111622",
+    "background_surface": "#182030",
+    "border_color": "#26334D",
+    "text_primary": "#F1F5F9",
+    "text_secondary": "#94A3B8",
+    "accent_emerald": "#10B981",
+    "accent_amber": "#F59E0B",
+    "accent_cyan": "#06B6D4",
+    "accent_danger": "#EF4444"
+  },
+  "typography": {
+    "headline_font": "Outfit, sans-serif",
+    "body_font": "Plus Jakarta Sans, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap",
+    "hierarchy": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-semibold tracking-normal",
+      "h4": "text-lg sm:text-xl font-semibold",
+      "body": "text-sm sm:text-base leading-relaxed",
+      "mono_label": "font-mono text-xs tracking-wider uppercase"
+    }
+  },
+  "spacing_and_layout": {
+    "container_padding": "p-4 sm:p-6 lg:p-8",
+    "card_padding": "p-5 sm:p-6",
+    "grid_gap": "gap-4 sm:gap-6",
+    "max_width": "max-w-7xl mx-auto"
+  },
+  "image_urls": {
+    "charity_donation": "https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "community_relief": "https://images.pexels.com/photos/7345451/pexels-photo-7345451.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "food_packing_aid": "https://images.unsplash.com/photo-1593113616828-6f22bca04804?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "digital_geo_map": "https://images.pexels.com/photos/4048104/pexels-photo-4048104.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+  },
+  "key_features_to_build": [
+    "YouTube Link Converter & Short URL Beacon Generator (Instant QR code, custom slug, aid campaign tags)",
+    "Interactive Live Geospatial Map Dashboard (Leaflet / OpenStreetMap with pulse markers, beneficiary detail popups, cluster toggles)",
+    "Location Signal Interstitial Gate (/r/:shortCode) - Captures GPS/browser location with empathetic aid mission dialog, falls back to IP geo, then seamlessly redirects to YouTube video",
+    "Per-Link & Global Location Records Table (Coordinates, estimated city/country, timestamp, device info, distance calculation, dispatch status)",
+    "Direct Aid Outreach Dispatch System (Mark pin as Pending, Dispatched, Delivered, or Unreachable with notes)",
+    "Exportable Reports (CSV/JSON location logs for field team dispatch)"
+  ],
+  "testing_and_data_attributes": {
+    "required": true,
+    "pattern": "data-testid='kebab-case-descriptive-id'",
+    "examples": [
+      "data-testid='youtube-url-input'",
+      "data-testid='generate-link-button'",
+      "data-testid='short-link-copy-button'",
+      "data-testid='interactive-map-container'",
+      "data-testid='visitor-location-table'",
+      "data-testid='grant-location-access-button'",
+      "data-testid='dispatch-aid-button'",
+      "data-testid='export-logs-button'"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure Leaflet maps work seamlessly in React with custom map tile dark styling (e.g. CartoDB Dark Matter tiles: https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png).",
+    "Include real browser Geolocation API triggering on the visitor link page (/r/:shortCode) with graceful fallback to IP-based location lookup via backend or free geoip fallback.",
+    "Add a quick simulator toggle in Admin UI to test new link clicks and fake location broadcasts for demo/testing without needing multiple devices.",
+    "Ensure all interactive buttons, inputs, links, and cards have data-testid attributes.",
+    "Never use generic centered layouts or unstyled plain tables; use glassmorphism card containers, glowing badge statuses, mono coordinates, and high contrast interactive controls."
+  ]
+}

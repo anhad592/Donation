@@ -1,0 +1,40 @@
+.App {
+  min-height: 100vh;
+}
+
+/* Leaflet dark tweaks */
+.leaflet-container {
+  background: #0A0D14;
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #182030;
+  color: #F1F5F9;
+  border: 1px solid #26334D;
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+}
+.leaflet-control-attribution {
+  background: rgba(10, 13, 20, 0.7) !important;
+  color: #64748b !important;
+}
+.leaflet-control-attribution a {
+  color: #94A3B8 !important;
+}
+
+/* Pulsing marker */
+.pulse-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 0 rgba(16, 185, 129, 0.6);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+  70% { box-shadow: 0 0 0 16px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
