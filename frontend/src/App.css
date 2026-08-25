@@ -33,6 +33,13 @@
   box-shadow: 0 0 0 rgba(16, 185, 129, 0.6);
   animation: pulse 2s infinite;
 }
+.offline-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #64748b;
+  border: 2px solid #475569;
+}
 @keyframes pulse {
   0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
   70% { box-shadow: 0 0 0 16px rgba(16, 185, 129, 0); }

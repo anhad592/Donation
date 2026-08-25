@@ -9,6 +9,7 @@ import csv
 import asyncio
 import logging
 import secrets
+import uuid
 from pathlib import Path
 from pydantic import BaseModel, Field, BeforeValidator
 from typing import List, Optional, Annotated
@@ -218,7 +219,127 @@ async def resolve_link(short_code: str):
 async def delete_link(short_code: str):
     await db.links.delete_one({"short_code": short_code})
     await db.records.delete_many({"short_code": short_code})
+    await db.sessions.delete_many({"short_code": short_code})
     return {"ok": True}
+
+
+# ---------- Live session tracking ----------
+ACTIVE_WINDOW_SECONDS = 40
+GEOCODE_THROTTLE_SECONDS = 15
+MAX_TRAIL_POINTS = 500
+
+
+class SessionStart(BaseModel):
+    short_code: str
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    accuracy: Optional[float] = None
+
+
+class SessionPing(BaseModel):
+    session_id: str
+    lat: float
+    lng: float
+    accuracy: Optional[float] = None
+
+
+def seconds_since(iso_str):
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        return (datetime.now(timezone.utc) - dt).total_seconds()
+    except Exception:
+        return 99999
+
+
+def decorate_session(doc):
+    doc = serialize(doc)
+    ago = seconds_since(doc.get("last_seen", ""))
+    doc["seconds_ago"] = int(ago)
+    doc["active"] = ago <= ACTIVE_WINDOW_SECONDS
+    return doc
+
+
+@api_router.post("/track/start")
+async def track_start(payload: SessionStart, request: Request):
+    link = await db.links.find_one({"short_code": payload.short_code})
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+
+    ip = get_client_ip(request)
+    ua = request.headers.get("user-agent")
+    device = parse_device(ua)
+
+    lat, lng, accuracy, method = payload.lat, payload.lng, payload.accuracy, "gps"
+    place = city = country = None
+    if lat is not None and lng is not None:
+        place, city, country = await asyncio.to_thread(reverse_geocode, lat, lng)
+    else:
+        glat, glng, gplace, gcity, gcountry = await asyncio.to_thread(ip_geolocate, ip)
+        lat, lng, place, city, country = glat, glng, gplace, gcity, gcountry
+        method = "ip"
+
+    now = now_iso()
+    sid = uuid.uuid4().hex
+    points = []
+    if lat is not None and lng is not None:
+        points.append({"lat": lat, "lng": lng, "t": now})
+
+    doc = {
+        "session_id": sid,
+        "short_code": payload.short_code,
+        "lat": lat, "lng": lng, "accuracy": accuracy, "method": method,
+        "place": place, "city": city, "country": country,
+        "ip": ip, "user_agent": ua, **device,
+        "points": points,
+        "first_seen": now, "last_seen": now, "geo_at": now,
+        "dispatch_status": "pending", "notes": None,
+    }
+    await db.sessions.insert_one(doc)
+    await db.links.update_one({"short_code": payload.short_code}, {"$inc": {"click_count": 1}})
+    return {"session_id": sid, "original_url": link["original_url"]}
+
+
+@api_router.post("/track/ping")
+async def track_ping(payload: SessionPing):
+    session = await db.sessions.find_one({"session_id": payload.session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    now = now_iso()
+    update = {
+        "lat": payload.lat, "lng": payload.lng,
+        "accuracy": payload.accuracy, "method": "gps", "last_seen": now,
+    }
+
+    # Re-geocode current area occasionally to keep it readable & cheap
+    if seconds_since(session.get("geo_at", "")) > GEOCODE_THROTTLE_SECONDS:
+        place, city, country = await asyncio.to_thread(reverse_geocode, payload.lat, payload.lng)
+        if place or city:
+            update.update({"place": place, "city": city, "country": country, "geo_at": now})
+
+    await db.sessions.update_one(
+        {"session_id": payload.session_id},
+        {
+            "$set": update,
+            "$push": {"points": {"$each": [{"lat": payload.lat, "lng": payload.lng, "t": now}], "$slice": -MAX_TRAIL_POINTS}},
+        },
+    )
+    return {"ok": True}
+
+
+@api_router.get("/sessions")
+async def list_sessions():
+    docs = await db.sessions.find().sort("last_seen", -1).to_list(2000)
+    return [decorate_session(d) for d in docs]
+
+
+@api_router.patch("/sessions/{session_id}")
+async def update_session(session_id: str, payload: RecordUpdate):
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if update:
+        await db.sessions.update_one({"session_id": session_id}, {"$set": update})
+    doc = await db.sessions.find_one({"session_id": session_id})
+    return decorate_session(doc)
 
 
 @api_router.post("/track")
@@ -273,43 +394,63 @@ async def update_record(record_id: str, payload: RecordUpdate):
 
 @api_router.get("/export")
 async def export_csv():
-    docs = await db.records.find().sort("timestamp", -1).to_list(10000)
+    docs = await db.sessions.find().sort("last_seen", -1).to_list(10000)
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["short_code", "lat", "lng", "accuracy", "method", "place", "city", "country", "ip", "device_type", "device_brand", "device_model", "os", "browser", "dispatch_status", "notes", "timestamp"])
+    writer.writerow(["session_id", "short_code", "lat", "lng", "accuracy", "method", "place", "city", "country", "ip", "device_type", "device_brand", "device_model", "os", "browser", "points", "dispatch_status", "notes", "first_seen", "last_seen"])
     for d in docs:
         writer.writerow([
-            d.get("short_code"), d.get("lat"), d.get("lng"), d.get("accuracy"), d.get("method"),
+            d.get("session_id"), d.get("short_code"), d.get("lat"), d.get("lng"), d.get("accuracy"), d.get("method"),
             d.get("place"), d.get("city"), d.get("country"), d.get("ip"),
             d.get("device_type"), d.get("device_brand"), d.get("device_model"), d.get("os"), d.get("browser"),
-            d.get("dispatch_status"), d.get("notes"), d.get("timestamp"),
+            len(d.get("points", [])), d.get("dispatch_status"), d.get("notes"), d.get("first_seen"), d.get("last_seen"),
         ])
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]), media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=location_records.csv"},
+        headers={"Content-Disposition": "attachment; filename=live_sessions.csv"},
     )
 
 
-# Simulator endpoint for demo/testing (fake a visitor click with location)
+# Simulator: creates a live session, or moves an existing simulated one to mimic real-time movement
 @api_router.post("/simulate")
 async def simulate(payload: TrackCreate):
     link = await db.links.find_one({"short_code": payload.short_code})
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
+
+    now = now_iso()
+    existing = await db.sessions.find_one({"short_code": payload.short_code, "ip": "simulated"})
+    if existing and seconds_since(existing.get("last_seen", "")) < 120:
+        # move it slightly to simulate live movement
+        new_lat = (existing.get("lat") or payload.lat) + (secrets.randbelow(200) - 100) / 5000.0
+        new_lng = (existing.get("lng") or payload.lng) + (secrets.randbelow(200) - 100) / 5000.0
+        await db.sessions.update_one(
+            {"session_id": existing["session_id"]},
+            {
+                "$set": {"lat": new_lat, "lng": new_lng, "last_seen": now},
+                "$push": {"points": {"$each": [{"lat": new_lat, "lng": new_lng, "t": now}], "$slice": -MAX_TRAIL_POINTS}},
+            },
+        )
+        doc = await db.sessions.find_one({"session_id": existing["session_id"]})
+        return decorate_session(doc)
+
     place, city, country = await asyncio.to_thread(reverse_geocode, payload.lat, payload.lng)
     sample_ua = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36"
     device = parse_device(sample_ua)
-    record = LocationRecord(
-        short_code=payload.short_code, lat=payload.lat, lng=payload.lng,
-        accuracy=payload.accuracy or 20, method="gps",
-        place=place, city=city, country=country, ip="simulated", user_agent=sample_ua,
-        **device,
-    )
-    doc = record.model_dump(by_alias=True, exclude={"id"})
-    await db.records.insert_one(doc)
+    sid = uuid.uuid4().hex
+    doc = {
+        "session_id": sid, "short_code": payload.short_code,
+        "lat": payload.lat, "lng": payload.lng, "accuracy": payload.accuracy or 15, "method": "gps",
+        "place": place, "city": city, "country": country,
+        "ip": "simulated", "user_agent": sample_ua, **device,
+        "points": [{"lat": payload.lat, "lng": payload.lng, "t": now}],
+        "first_seen": now, "last_seen": now, "geo_at": now,
+        "dispatch_status": "pending", "notes": None,
+    }
+    await db.sessions.insert_one(doc)
     await db.links.update_one({"short_code": payload.short_code}, {"$inc": {"click_count": 1}})
-    return serialize(doc)
+    return decorate_session(doc)
 
 
 app.include_router(api_router)
