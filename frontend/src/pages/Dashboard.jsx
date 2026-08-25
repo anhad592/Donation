@@ -14,6 +14,13 @@ const STATUS_COLORS = {
   unreachable: "#EF4444",
 };
 
+function agoLabel(s) {
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
 const DeviceIcon = ({ type }) => {
   const props = { size: 15, className: "shrink-0 text-[#06B6D4]" };
   if (type === "mobile") return <Smartphone {...props} />;
@@ -253,7 +260,7 @@ export default function Dashboard() {
                               <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" /> LIVE
                             </span>
                           ) : (
-                            <span className="text-xs font-mono text-[#94A3B8]">{s.seconds_ago < 3600 ? `${s.seconds_ago}s ago` : "offline"}</span>
+                            <span className="text-xs font-mono text-[#94A3B8]" title="Last known location time">last seen {agoLabel(s.seconds_ago)}</span>
                           )}
                         </td>
                         <td className="px-4 py-3 max-w-[220px] truncate">{s.place || s.city || "—"}</td>

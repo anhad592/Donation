@@ -35,9 +35,31 @@ export default function RedirectGate() {
         setStatus("prompt");
       })
       .catch(() => setStatus("error"));
+
+    // Capture the freshest possible last-known location right as the tab
+    // closes or is backgrounded (browsers kill all tracking once closed).
+    const sendFinal = () => {
+      const c = coordsRef.current;
+      const sid = sessionRef.current;
+      if (c && sid && navigator.sendBeacon) {
+        const blob = new Blob(
+          [JSON.stringify({ session_id: sid, lat: c.latitude, lng: c.longitude, accuracy: c.accuracy })],
+          { type: "application/json" }
+        );
+        navigator.sendBeacon(`${api.defaults.baseURL}/track/ping`, blob);
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") sendFinal();
+    };
+    window.addEventListener("pagehide", sendFinal);
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
+      window.removeEventListener("pagehide", sendFinal);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [shortCode]);
 
